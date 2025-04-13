@@ -1,7 +1,6 @@
 namespace DotsFisher
 {
     using Cysharp.Threading.Tasks;
-    using DotsFisher.Conponent;
     using System.Threading;
     using Unity.Entities;
 
@@ -16,9 +15,6 @@ namespace DotsFisher
             {
                 fixedSimulationGroup.Timestep = 1.0f / 60;
             }
-
-            var entity = world.EntityManager.CreateEntity();
-            world.EntityManager.AddComponent<BulletSpawnRequestComponent>(entity);
 
             while (!token.IsCancellationRequested)
             {

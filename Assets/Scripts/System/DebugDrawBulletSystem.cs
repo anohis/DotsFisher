@@ -29,7 +29,8 @@
             DebugUtils.DrawWireCircle(
                 transform.Position.ToPosition3D(),
                 1,
-                Color.red);
+                Color.red,
+                segments: 8);
         }
     }
 }

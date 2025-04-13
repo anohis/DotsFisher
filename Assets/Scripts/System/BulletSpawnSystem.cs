@@ -8,10 +8,13 @@ namespace DotsFisher.Conponent
     [UpdateInGroup(typeof(GameSystemGroup))]
     public partial struct BulletSpawnSystem : ISystem
     {
+        private Random _rnd;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BulletSpawnRequestComponent>();
+            _rnd = Random.CreateFromIndex(0);
         }
 
         [BurstCompile]
@@ -26,9 +29,7 @@ namespace DotsFisher.Conponent
 
             for (int i = 0; i < count; i++)
             {
-                var random = Random.CreateFromIndex((uint)i);
-
-                var rotation = math.radians(random.NextFloat(0, 360f));
+                var rotation = math.radians(_rnd.NextFloat(0, 360f));
                 var direction = CoordinateUtils.RadiansToDirection(rotation);
 
                 var entity = state.EntityManager.CreateEntity();
