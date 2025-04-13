@@ -1,9 +1,9 @@
-using Cysharp.Threading.Tasks;
-using System.Threading;
-using UnityEngine;
-
 namespace DotsFisher
 {
+    using Cysharp.Threading.Tasks;
+    using System.Threading;
+    using UnityEngine;
+
     public class MainScene : MonoBehaviour
     {
         private CancellationTokenSource _cts;
