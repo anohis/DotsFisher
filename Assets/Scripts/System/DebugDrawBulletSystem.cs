@@ -12,6 +12,8 @@
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<TransformComponent>();
+            state.RequireForUpdate<BulletComponent>();
+            state.RequireForUpdate<CircleColliderComponent>();
         }
 
         [BurstCompile]
@@ -24,11 +26,13 @@
     [BurstCompile]
     public partial struct DrawBulletJob : IJobEntity
     {
-        private void Execute(in TransformComponent transform)
+        private void Execute(
+            in TransformComponent transform,
+            in CircleColliderComponent collider)
         {
             DebugUtils.DrawWireCircle(
                 transform.Position.ToPosition3D(),
-                1,
+                collider.Radius,
                 Color.red,
                 segments: 8);
         }

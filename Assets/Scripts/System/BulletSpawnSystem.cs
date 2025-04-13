@@ -43,6 +43,11 @@ namespace DotsFisher.Conponent
                     Position = float2.zero,
                     Rotation = rotation,
                 });
+                state.EntityManager.AddComponentData(entity, new CircleColliderComponent
+                {
+                    Radius = 1f,
+                });
+                state.EntityManager.AddComponentData(entity, new BulletComponent());
             }
 
             state.EntityManager.RemoveComponent<BulletSpawnRequestComponent>(newSpawnQuery);
