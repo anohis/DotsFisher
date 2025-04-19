@@ -83,7 +83,7 @@
 
             public void Reset()
             {
-                throw new System.NotImplementedException();
+                throw new NotImplementedException();
             }
         }
 

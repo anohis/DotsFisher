@@ -1,5 +1,6 @@
-namespace DotsFisher.Component
+namespace DotsFisher.EcsSystem
 {
+    using DotsFisher.EcsComponent;
     using Unity.Burst;
     using Unity.Entities;
     using UnityEngine;

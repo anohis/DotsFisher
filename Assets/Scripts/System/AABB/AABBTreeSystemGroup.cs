@@ -1,4 +1,4 @@
-namespace DotsFisher
+namespace DotsFisher.EcsSystem
 {
     using Unity.Entities;
 
