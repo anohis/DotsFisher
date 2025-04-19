@@ -35,12 +35,12 @@ namespace DotsFisher.Conponent
                 var entity = state.EntityManager.CreateEntity();
                 state.EntityManager.AddComponentData(entity, new MovementComponent
                 {
-                    Speed = 1,
+                    Speed = 0,
                     Direction = direction,
                 });
                 state.EntityManager.AddComponentData(entity, new TransformComponent
                 {
-                    Position = float2.zero,
+                    Position = _rnd.NextFloat2(new float2(-10, -10), new float2(10, 10)),
                     Rotation = rotation,
                 });
                 state.EntityManager.AddComponentData(entity, new CircleColliderComponent
