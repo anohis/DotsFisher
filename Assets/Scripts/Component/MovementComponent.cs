@@ -1,4 +1,4 @@
-namespace DotsFisher.Conponent
+namespace DotsFisher.Component
 {
     using Unity.Entities;
     using Unity.Mathematics;
