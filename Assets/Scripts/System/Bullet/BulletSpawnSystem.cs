@@ -35,7 +35,7 @@ namespace DotsFisher.Conponent
                 var entity = state.EntityManager.CreateEntity();
                 state.EntityManager.AddComponentData(entity, new MovementComponent
                 {
-                    Speed = 0,
+                    Speed = 1,
                     Direction = direction,
                 });
                 state.EntityManager.AddComponentData(entity, new TransformComponent

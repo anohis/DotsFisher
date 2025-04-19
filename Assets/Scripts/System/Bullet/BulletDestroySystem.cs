@@ -5,7 +5,7 @@ namespace DotsFisher.Conponent
     using Unity.Entities;
 
     [UpdateInGroup(typeof(GameSystemGroup))]
-    [UpdateAfter(typeof(AABBTreeDeleteSystem))]
+    [UpdateAfter(typeof(AABBTreeSystemGroup))]
     public partial struct BulletDestroySystem : ISystem
     {
         [BurstCompile]
