@@ -1,9 +1,6 @@
 ﻿namespace DotsFisher.Utils
 {
-    using DotsFisher.Utils.Native;
     using System;
-    using System.Collections;
-    using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using Unity.Collections;
     using Unity.Collections.LowLevel.Unsafe;
@@ -15,76 +12,13 @@
         private const int RootIndex = 0;
         private const uint InvalidEntryId = 0;
 
-        public struct TreeNode
+        private struct TreeNode
         {
             public bool IsValid;
             public uint EntryId;
             public AABB AABB;
 
             public bool IsLeaf => EntryId != InvalidEntryId;
-        }
-
-        public unsafe struct Enumerator : IEnumerator<TreeNode>
-        {
-            private readonly AABBTree* _tree;
-            private readonly NativeStack<int> _stack;
-
-            public Enumerator(AABBTree* tree, int index, Allocator allocator)
-            {
-                Current = default;
-                _tree = tree;
-                _stack = new NativeStack<int>(allocator);
-                if (_tree->HasNode(index))
-                {
-                    _stack.Push(index);
-                }
-            }
-
-            public TreeNode Current { get; private set; }
-
-            object IEnumerator.Current => Current;
-
-            public void Dispose()
-            {
-                _stack.Dispose();
-            }
-
-            public bool MoveNext()
-            {
-                if (_stack.Length <= 0)
-                {
-                    return false;
-                }
-
-                var index = _stack.Pop();
-                var node = _tree->GetNode(index);
-
-                Current = *node;
-
-                if (node->IsLeaf)
-                {
-                    return true;
-                }
-
-                var leftIndex = GetLeftIndex(index);
-                var rightIndex = GetRightIndex(index);
-
-                if (_tree->HasNode(leftIndex))
-                {
-                    _stack.Push(leftIndex);
-                }
-                if (_tree->HasNode(rightIndex))
-                {
-                    _stack.Push(rightIndex);
-                }
-
-                return true;
-            }
-
-            public void Reset()
-            {
-                throw new NotImplementedException();
-            }
         }
 
         private readonly Allocator _allocator;
@@ -153,11 +87,88 @@
             Insert(entryId, aabb);
         }
 
-        public Enumerator GetIterator(Allocator allocator)
+        public void Query(AABB aabb, ref NativeList<uint> result)
         {
-            fixed (AABBTree* tree = &this)
+            if (!HasNode(RootIndex))
             {
-                return new Enumerator(tree, RootIndex, allocator);
+                return;
+            }
+
+            var queue = new NativeQueue<int>(Allocator.Temp);
+            queue.Enqueue(RootIndex);
+
+            while (queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                var node = GetNode(index);
+                if (!AABB.IsOverlap(node->AABB, aabb))
+                {
+                    continue;
+                }
+
+                if (node->IsLeaf)
+                {
+                    result.Add(node->EntryId);
+                }
+                else
+                {
+                    queue.Enqueue(GetLeftIndex(index));
+                    queue.Enqueue(GetRightIndex(index));
+                }
+            }
+        }
+
+        public void Query(ref NativeList<AABB> result)
+        {
+            if (!HasNode(RootIndex))
+            {
+                return;
+            }
+
+            var queue = new NativeQueue<int>(Allocator.Temp);
+            queue.Enqueue(RootIndex);
+
+            while (queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                var node = GetNode(index);
+
+                result.Add(node->AABB);
+
+                if (!node->IsLeaf)
+                {
+                    queue.Enqueue(GetLeftIndex(index));
+                    queue.Enqueue(GetRightIndex(index));
+                }
+            }
+        }
+
+        public void Query(AABB aabb, ref NativeList<AABB> result)
+        {
+            if (!HasNode(RootIndex))
+            {
+                return;
+            }
+
+            var queue = new NativeQueue<int>(Allocator.Temp);
+            queue.Enqueue(RootIndex);
+
+            while (queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                var node = GetNode(index);
+                if (!AABB.IsOverlap(node->AABB, aabb))
+                {
+                    continue;
+                }
+
+                result.Add(node->AABB);
+
+                if (!node->IsLeaf)
+                {
+                    queue.Enqueue(GetLeftIndex(index));
+                    queue.Enqueue(GetRightIndex(index));
+                }
             }
         }
 

@@ -23,6 +23,12 @@ namespace DotsFisher.Utils
                 Max = math.max(a.Max, b.Max),
             };
 
+        public static bool IsOverlap(AABB a, AABB b)
+            => a.Min.x <= b.Max.x
+            && a.Max.x >= b.Min.x
+            && a.Min.y <= b.Max.y
+            && a.Max.y >= b.Min.y;
+
         public override string ToString()
         {
             return $"Min: {Min}, Max: {Max}";

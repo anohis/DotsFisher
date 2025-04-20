@@ -5,7 +5,6 @@ namespace DotsFisher.EcsSystem
     using Unity.Burst;
     using Unity.Collections;
     using Unity.Entities;
-    using Unity.Jobs;
     using UnityEngine;
 
     [UpdateInGroup(typeof(LateSimulationSystemGroup))]
@@ -21,39 +20,19 @@ namespace DotsFisher.EcsSystem
         public void OnUpdate(ref SystemState state)
         {
             var aabbTree = SystemAPI.GetSingleton<AABBTreeComponent>();
-            var list = new NativeList<AABB>(state.WorldUpdateAllocator);
+            var list = new NativeList<AABB>(Allocator.Temp);
 
-            unsafe
+            aabbTree.Tree.Query(ref list);
+
+            foreach (var v in list)
             {
-                var aabbEnumerator = aabbTree.Tree.GetIterator(Allocator.Temp);
-                while (aabbEnumerator.MoveNext())
-                {
-                    list.Add(aabbEnumerator.Current.AABB);
-                }
-                aabbEnumerator.Dispose();
+                DebugUtils.DrawWireRect(
+                   v.Min,
+                   v.Max,
+                   Color.green);
             }
 
-            state.Dependency = new DrawAABBJob
-            {
-                AABBs = list,
-            }.Schedule(list.Length, 32, state.Dependency);
-
-            state.Dependency = list.Dispose(state.Dependency);
-        }
-    }
-
-    [BurstCompile]
-    public struct DrawAABBJob : IJobParallelFor
-    {
-        [ReadOnly] public NativeList<AABB> AABBs;
-
-        public void Execute(int index)
-        {
-            var aabb = AABBs[index];
-            DebugUtils.DrawWireRect(
-               aabb.Min,
-               aabb.Max,
-               Color.green);
+            list.Dispose();
         }
     }
 }
