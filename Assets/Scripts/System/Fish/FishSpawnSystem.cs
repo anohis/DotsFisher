@@ -8,14 +8,14 @@ namespace DotsFisher.EcsSystem
     using Unity.Mathematics;
 
     [UpdateInGroup(typeof(GameSystemGroup))]
-    public partial struct BulletSpawnSystem : ISystem
+    public partial struct FishSpawnSystem : ISystem
     {
         private Random _rnd;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<BulletSpawnRequestComponent>();
+            state.RequireForUpdate<FishSpawnRequestComponent>();
             _rnd = Random.CreateFromIndex(0);
         }
 
@@ -25,7 +25,7 @@ namespace DotsFisher.EcsSystem
             var ecb = new EntityCommandBuffer(Allocator.Temp);
 
             foreach (var (_, entity) in SystemAPI
-                .Query<RefRO<BulletSpawnRequestComponent>>()
+                .Query<RefRO<FishSpawnRequestComponent>>()
                 .WithEntityAccess())
             {
                 var rotation = math.radians(_rnd.NextFloat(0, 360f));
@@ -45,8 +45,9 @@ namespace DotsFisher.EcsSystem
                 {
                     Radius = 1f,
                 });
-                ecb.AddComponent(entity, new BulletComponent());
-                ecb.RemoveComponent<BulletSpawnRequestComponent>(entity);
+                ecb.AddComponent(entity, new FishComponent());
+                ecb.AddComponent(entity, new AABBInsertRequestComponent());
+                ecb.RemoveComponent<FishSpawnRequestComponent>(entity);
             }
 
             ecb.Playback(state.EntityManager);

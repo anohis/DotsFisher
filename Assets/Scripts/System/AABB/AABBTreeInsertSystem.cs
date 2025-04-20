@@ -16,6 +16,7 @@ namespace DotsFisher.EcsSystem
             state.RequireForUpdate<AABBTreeComponent>();
             state.RequireForUpdate<TransformComponent>();
             state.RequireForUpdate<CircleColliderComponent>();
+            state.RequireForUpdate<AABBInsertRequestComponent>();
         }
 
         [BurstCompile]
@@ -28,7 +29,8 @@ namespace DotsFisher.EcsSystem
             foreach (var (transform, collider, entity)
                 in SystemAPI
                     .Query<RefRO<TransformComponent>, RefRO<CircleColliderComponent>>()
-                    .WithNone<AABBNodeComponent>()
+                    .WithAll<AABBInsertRequestComponent>()
+                    .WithNone<AABBNodeComponent, DestroyRequestComponent>()
                     .WithEntityAccess())
             {
                 var aabb = new AABB
@@ -43,6 +45,8 @@ namespace DotsFisher.EcsSystem
                 {
                     EntryId = entryId,
                 });
+
+                ecb.RemoveComponent<AABBInsertRequestComponent>(entity);
             }
 
             ecb.Playback(state.EntityManager);
