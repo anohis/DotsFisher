@@ -3,7 +3,9 @@
     using DotsFisher.EcsComponent;
     using DotsFisher.Utils;
     using Unity.Burst;
+    using Unity.Collections;
     using Unity.Entities;
+    using Unity.Jobs;
     using UnityEngine;
 
     [UpdateInGroup(typeof(LateSimulationSystemGroup))]
@@ -20,20 +22,36 @@
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            new DrawBulletJob().ScheduleParallel();
+            var query = SystemAPI
+                .QueryBuilder()
+                .WithAll<BulletComponent, TransformComponent, CircleColliderComponent>()
+                .Build();
+
+            var transforms = query.ToComponentDataArray<TransformComponent>(state.WorldUpdateAllocator);
+            var colliders = query.ToComponentDataArray<CircleColliderComponent>(state.WorldUpdateAllocator);
+
+            state.Dependency = new DrawBulletJob
+            {
+                Transforms = transforms,
+                Colliders = colliders,
+            }.Schedule(transforms.Length, 32, state.Dependency);
+
+            state.Dependency = transforms.Dispose(state.Dependency);
+            state.Dependency = colliders.Dispose(state.Dependency);
         }
     }
 
     [BurstCompile]
-    public partial struct DrawBulletJob : IJobEntity
+    public struct DrawBulletJob : IJobParallelFor
     {
-        private void Execute(
-            in TransformComponent transform,
-            in CircleColliderComponent collider)
+        [ReadOnly] public NativeArray<TransformComponent> Transforms;
+        [ReadOnly] public NativeArray<CircleColliderComponent> Colliders;
+
+        public void Execute(int index)
         {
             DebugUtils.DrawWireCircle(
-                transform.Position.ToPosition3D(),
-                collider.Radius,
+                Transforms[index].Position.ToPosition3D(),
+                Colliders[index].Radius,
                 Color.red,
                 segments: 8);
         }
