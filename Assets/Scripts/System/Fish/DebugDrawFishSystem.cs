@@ -1,59 +1,49 @@
 ﻿namespace DotsFisher.EcsSystem
 {
     using DotsFisher.EcsComponent;
+    using DotsFisher.Mono;
     using DotsFisher.Utils;
-    using Unity.Burst;
-    using Unity.Collections;
+    using System.Linq;
     using Unity.Entities;
-    using Unity.Jobs;
-    using UnityEngine;
 
     [UpdateInGroup(typeof(LateSimulationSystemGroup))]
-    public partial struct DebugDrawFishSystem : ISystem
+    public partial class DebugDrawFishSystem : SystemBase
     {
-        [BurstCompile]
-        public void OnCreate(ref SystemState state)
+        private FishDebugDrawer _drawer;
+
+        public void Initialize(FishDebugDrawer drawer)
         {
-            state.RequireForUpdate<TransformComponent>();
-            state.RequireForUpdate<FishComponent>();
-            state.RequireForUpdate<CircleColliderComponent>();
+            _drawer = drawer;
         }
 
-        [BurstCompile]
-        public void OnUpdate(ref SystemState state)
+        protected override void OnCreate()
+        {
+            CheckedStateRef.RequireForUpdate<TransformComponent>();
+            CheckedStateRef.RequireForUpdate<FishComponent>();
+            CheckedStateRef.RequireForUpdate<CircleColliderComponent>();
+        }
+
+        protected override void OnUpdate()
         {
             var query = SystemAPI
                 .QueryBuilder()
                 .WithAll<FishComponent, TransformComponent, CircleColliderComponent>()
                 .Build();
 
-            var transforms = query.ToComponentDataArray<TransformComponent>(state.WorldUpdateAllocator);
-            var colliders = query.ToComponentDataArray<CircleColliderComponent>(state.WorldUpdateAllocator);
+            var transforms = query.ToComponentDataArray<TransformComponent>(CheckedStateRef.WorldUpdateAllocator);
+            var colliders = query.ToComponentDataArray<CircleColliderComponent>(CheckedStateRef.WorldUpdateAllocator);
 
-            state.Dependency = new DrawFishJob
+            _drawer.Draw(transforms.Select((transform, index) =>
             {
-                Transforms = transforms,
-                Colliders = colliders,
-            }.Schedule(transforms.Length, 32, state.Dependency);
+                return new FishDebugDrawer.Fish
+                {
+                    Position = transform.Position.ToPosition3D(),
+                    Radius = colliders[index].Radius,
+                };
+            }));
 
-            state.Dependency = transforms.Dispose(state.Dependency);
-            state.Dependency = colliders.Dispose(state.Dependency);
-        }
-    }
-
-    [BurstCompile]
-    public struct DrawFishJob : IJobParallelFor
-    {
-        [ReadOnly] public NativeArray<TransformComponent> Transforms;
-        [ReadOnly] public NativeArray<CircleColliderComponent> Colliders;
-
-        public void Execute(int index)
-        {
-            DebugUtils.DrawWireCircle(
-                Transforms[index].Position.ToPosition3D(),
-                Colliders[index].Radius,
-                Color.yellow,
-                segments: 8);
+            CheckedStateRef.Dependency = transforms.Dispose(CheckedStateRef.Dependency);
+            CheckedStateRef.Dependency = colliders.Dispose(CheckedStateRef.Dependency);
         }
     }
 }
