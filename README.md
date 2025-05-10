@@ -10,6 +10,6 @@ Traditional object-oriented programming (OOP) becomes inefficient when handling 
 - [ ] Vast open ocean environment
 
 # Collision
-Using an AABB Tree to accelerate collision detection, maintaining over 100 FPS even with 1,000 fish in the scene.
+Using an AABB Tree to accelerate collision detection, maintaining over 60 FPS even with 1,000 fish in the scene.
 
-![Unity_vEd1LRUW8n](https://github.com/user-attachments/assets/75fbe1c4-55aa-4843-a37f-d21e9497bc07)
+![Unity_R2CJGVAsSH](https://github.com/user-attachments/assets/92fc831c-4eca-443d-85a4-30fa031c007a)
