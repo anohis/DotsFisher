@@ -59,32 +59,25 @@
             }
 
             _nodeMap.Remove(entryId);
-            RemoveNode(nodeIndex);
-
-            if (nodeIndex == RootIndex)
-            {
-                return;
-            }
-
-            var parentIndex = GetParentIndex(nodeIndex);
-            var leftIndex = GetLeftIndex(parentIndex);
-            var otherIndex = nodeIndex == leftIndex
-                ? GetRightIndex(parentIndex)
-                : leftIndex;
-            MoveNodeUpBFS(otherIndex, parentIndex);
-
-            if (parentIndex == RootIndex)
-            {
-                return;
-            }
-
-            UpdateAABBUp(GetParentIndex(parentIndex));
+            Delete(nodeIndex);
         }
 
         public void Update(uint entryId, AABB aabb)
         {
-            Delete(entryId);
+            if (_nodeMap.TryGetValue(entryId, out var nodeIndex)
+                && AABB.IsContains(GetNode(nodeIndex)->AABB, aabb))
+            {
+                return;
+            }
+
             Insert(entryId, aabb);
+
+            var newIndex = _nodeMap[entryId];
+            var neighborIndex = GetNeighborIndex(newIndex);
+            var shouldDeleteIndex = GetNode(neighborIndex)->EntryId == entryId
+                ? neighborIndex
+                : nodeIndex;
+            Delete(shouldDeleteIndex);
         }
 
         public void Query(AABB aabb, ref NativeList<uint> result)
@@ -226,6 +219,8 @@
 
         private void Insert(uint entryId, AABB aabb)
         {
+            aabb = AABB.Expand(aabb, 1);
+
             if (!HasNode(RootIndex))
             {
                 CheckCapacity(RootIndex);
@@ -247,6 +242,27 @@
             CreateLeafNode(rightIndex, entryId, aabb);
 
             UpdateAABBUp(selectedIndex);
+        }
+
+        private void Delete(int nodeIndex)
+        {
+            RemoveNode(nodeIndex);
+
+            if (nodeIndex == RootIndex)
+            {
+                return;
+            }
+
+            var parentIndex = GetParentIndex(nodeIndex);
+            var neighborIndex = GetNeighborIndex(nodeIndex);
+            MoveNodeUpBFS(neighborIndex, parentIndex);
+
+            if (parentIndex == RootIndex)
+            {
+                return;
+            }
+
+            UpdateAABBUp(GetParentIndex(parentIndex));
         }
 
         private void UpdateAABBUp(int index)
@@ -406,6 +422,15 @@
         private static int GetParentIndex(int index)
         {
             return (index - 1) >> 1;
+        }
+
+        private static int GetNeighborIndex(int index)
+        {
+            var parent = GetParentIndex(index);
+            var left = GetLeftIndex(parent);
+            return left == index
+                ? GetRightIndex(parent)
+                : left;
         }
     }
 }

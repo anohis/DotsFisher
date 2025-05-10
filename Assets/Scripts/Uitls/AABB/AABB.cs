@@ -29,6 +29,20 @@ namespace DotsFisher.Utils
             && a.Min.y <= b.Max.y
             && a.Max.y >= b.Min.y;
 
+        public static bool IsContains(AABB a, AABB b)
+        {
+            return math.all(a.Min <= b.Min) && math.all(a.Max >= b.Max);
+        }
+
+        public static AABB Expand(AABB a, float size)
+        {
+            return new AABB
+            {
+                Min = a.Min - size,
+                Max = a.Max + size,
+            };
+        }
+
         public override string ToString()
         {
             return $"Min: {Min}, Max: {Max}";
