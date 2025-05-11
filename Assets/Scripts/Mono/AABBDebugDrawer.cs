@@ -29,6 +29,9 @@ namespace DotsFisher.Mono
             }
         }
 
+        [SerializeField] private bool _useJob = true;
+        [SerializeField] private int _batchSize = 128;
+
         private List<AABB> _aabbs = new List<AABB>();
 
         public void Draw(IEnumerable<AABB> aabb)
@@ -39,13 +42,26 @@ namespace DotsFisher.Mono
 
         private void OnDrawGizmos()
         {
-            using var array = _aabbs.ToNativeArray(Allocator.TempJob);
-            var job = new DrawJob
+            if (_useJob)
             {
-                AABBs = array,
-            };
-            var handler = job.Schedule(array.Length, 32);
-            handler.Complete();
+                using var array = _aabbs.ToNativeArray(Allocator.TempJob);
+                var job = new DrawJob
+                {
+                    AABBs = array,
+                };
+                var handler = job.Schedule(array.Length, _batchSize);
+                handler.Complete();
+            }
+            else
+            {
+                foreach (var aabb in _aabbs)
+                {
+                    DebugUtils.DrawWireRect(
+                        aabb.Min,
+                        aabb.Max,
+                        Color.green);
+                }
+            }
         }
     }
 }

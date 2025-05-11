@@ -30,6 +30,9 @@ namespace DotsFisher.Mono
             }
         }
 
+        [SerializeField] private bool _useJob = true;
+        [SerializeField] private int _batchSize = 128;
+
         private List<Bullet> _bullets = new List<Bullet>();
 
         public void Draw(IEnumerable<Bullet> bullets)
@@ -40,13 +43,27 @@ namespace DotsFisher.Mono
 
         private void OnDrawGizmos()
         {
-            using var array = _bullets.ToNativeArray(Allocator.TempJob);
-            var job = new DrawJob
+            if (_useJob)
             {
-                Bullets = array,
-            };
-            var handler = job.Schedule(array.Length, 32);
-            handler.Complete();
+                using var array = _bullets.ToNativeArray(Allocator.TempJob);
+                var job = new DrawJob
+                {
+                    Bullets = array,
+                };
+                var handler = job.Schedule(array.Length, _batchSize);
+                handler.Complete();
+            }
+            else
+            {
+                foreach (var bullet in _bullets)
+                {
+                    DebugUtils.DrawWireCircle(
+                        bullet.Position,
+                        bullet.Radius,
+                        Color.red,
+                        segments: 8);
+                }
+            }
         }
     }
 }
