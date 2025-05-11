@@ -43,6 +43,11 @@ namespace DotsFisher.Mono
 
         private void OnDrawGizmos()
         {
+            if (!enabled)
+            {
+                return;
+            }
+
             if (_useJob)
             {
                 using var array = _bullets.ToNativeArray(Allocator.TempJob);
