@@ -317,10 +317,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0df21b868b4382b4c9ab2f1b84accd34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _root: {fileID: 0}
-  _fishPrefab: {fileID: 0}
-  _bulletTarget: {fileID: 0}
-  _fishTarget: {fileID: 0}
   _fishDebugDrawer: {fileID: 2115859864}
   _bulletDebugDrawer: {fileID: 2115859867}
   _aabbDebugDrawer: {fileID: 2115859866}
@@ -441,8 +437,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2115859865}
   - component: {fileID: 2115859864}
-  - component: {fileID: 2115859867}
   - component: {fileID: 2115859866}
+  - component: {fileID: 2115859867}
   m_Layer: 0
   m_Name: DebugDrawer
   m_TagString: Untagged
@@ -462,6 +458,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 436fca290c4d1b84281978aaf74bd371, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _useJob: 1
+  _batchSize: 128
+  _maxDisplayCount: 10000
 --- !u!4 &2115859865
 Transform:
   m_ObjectHideFlags: 0
@@ -489,6 +488,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3224d15ab5f12c846adeac049cb4ce98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _useJob: 1
+  _batchSize: 128
+  _maxDisplayCount: 10000
 --- !u!114 &2115859867
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -501,6 +503,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 871a718a4c3f3394c96c155bfd3685d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _useJob: 1
+  _batchSize: 128
+  _maxDisplayCount: 10000
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

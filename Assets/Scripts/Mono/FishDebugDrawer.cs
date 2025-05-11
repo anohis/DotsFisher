@@ -2,6 +2,7 @@ namespace DotsFisher.Mono
 {
     using DotsFisher.Utils;
     using System.Collections.Generic;
+    using System.Linq;
     using Unity.Burst;
     using Unity.Collections;
     using Unity.Jobs;
@@ -32,13 +33,14 @@ namespace DotsFisher.Mono
 
         [SerializeField] private bool _useJob = true;
         [SerializeField] private int _batchSize = 128;
+        [SerializeField] private int _maxDisplayCount = 1000;
 
         private List<Fish> _fishes = new List<Fish>();
 
         public void Draw(IEnumerable<Fish> fishes)
         {
             _fishes.Clear();
-            _fishes.AddRange(fishes);
+            _fishes.AddRange(fishes.Take(_maxDisplayCount));
         }
 
         private void OnDrawGizmos()
