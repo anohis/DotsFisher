@@ -17,7 +17,7 @@ namespace DotsFisher.EcsSystem
         {
             state.Enabled = false;
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 10000; i++)
             {
                 var entity = state.EntityManager.CreateEntity();
                 state.EntityManager.AddComponentData(entity, new FishSpawnRequestComponent());

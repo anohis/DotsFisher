@@ -1,47 +1,37 @@
 ﻿namespace DotsFisher.Utils
 {
     using System;
-    using System.Runtime.CompilerServices;
     using Unity.Collections;
     using Unity.Collections.LowLevel.Unsafe;
-    using Unity.Jobs.LowLevel.Unsafe;
     using Unity.Mathematics;
 
     public unsafe struct AABBTree : IDisposable
     {
-        private const int RootIndex = 0;
         private const uint InvalidEntryId = 0;
 
         private struct TreeNode
         {
-            public bool IsValid;
             public uint EntryId;
             public AABB AABB;
+            public TreeNode* Parent;
+            public TreeNode* Left;
+            public TreeNode* Right;
 
-            public bool IsLeaf => EntryId != InvalidEntryId;
+            public bool IsLeaf => Left == null && Right == null;
         }
 
         private readonly Allocator _allocator;
 
-        private TreeNode* _nodes;
-        private int _capacity;
+        private TreeNode* _root;
         private uint _serialNumber;
-        private NativeHashMap<uint, int> _nodeMap;
+        private NativeHashMap<uint, IntPtr> _nodeMap;
 
         public AABBTree(int capacity, Allocator allocator)
         {
+            _root = null;
             _allocator = allocator;
             _serialNumber = 0;
-            _capacity = MathUtils.NextPowerOfTwo(capacity);
-            _nodeMap = new NativeHashMap<uint, int>(_capacity, _allocator);
-            _nodes = (TreeNode*)UnsafeUtility.Malloc(sizeof(TreeNode) * _capacity, JobsUtility.CacheLineSize, allocator);
-            for (int i = 0; i < _capacity; i++)
-            {
-                *GetNode(i) = new TreeNode
-                {
-                    IsValid = false,
-                };
-            }
+            _nodeMap = new NativeHashMap<uint, IntPtr>(capacity, _allocator);
         }
 
         public uint Insert(AABB aabb)
@@ -53,47 +43,46 @@
 
         public void Delete(uint entryId)
         {
-            if (!_nodeMap.TryGetValue(entryId, out var nodeIndex))
+            if (!_nodeMap.TryGetValue(entryId, out var nodePtr))
             {
                 return;
             }
 
             _nodeMap.Remove(entryId);
-            Delete(nodeIndex);
+            Delete((TreeNode*)nodePtr);
         }
 
         public void Update(uint entryId, AABB aabb)
         {
-            if (_nodeMap.TryGetValue(entryId, out var nodeIndex)
-                && AABB.IsContains(GetNode(nodeIndex)->AABB, aabb))
+            if (_nodeMap.TryGetValue(entryId, out var nodePtr)
+                && AABB.IsContains(((TreeNode*)nodePtr)->AABB, aabb))
             {
                 return;
             }
 
             Insert(entryId, aabb);
 
-            var newIndex = _nodeMap[entryId];
-            var neighborIndex = GetNeighborIndex(newIndex);
-            var shouldDeleteIndex = GetNode(neighborIndex)->EntryId == entryId
-                ? neighborIndex
-                : nodeIndex;
-            Delete(shouldDeleteIndex);
+            var newNode = (TreeNode*)_nodeMap[entryId];
+            var neighbor = GetNeighbor(newNode);
+            var nodeToDelete = neighbor->EntryId == entryId
+                ? neighbor
+                : (TreeNode*)nodePtr;
+            Delete(nodeToDelete);
         }
 
         public void Query(AABB aabb, ref NativeList<uint> result)
         {
-            if (!HasNode(RootIndex))
+            if (_root == null)
             {
                 return;
             }
 
-            var queue = new NativeQueue<int>(Allocator.Temp);
-            queue.Enqueue(RootIndex);
+            using var queue = new NativeQueue<IntPtr>(Allocator.Temp);
+            queue.Enqueue((IntPtr)_root);
 
             while (queue.Count > 0)
             {
-                var index = queue.Dequeue();
-                var node = GetNode(index);
+                var node = (TreeNode*)queue.Dequeue();
                 if (!AABB.IsOverlap(node->AABB, aabb))
                 {
                     continue;
@@ -105,51 +94,50 @@
                 }
                 else
                 {
-                    queue.Enqueue(GetLeftIndex(index));
-                    queue.Enqueue(GetRightIndex(index));
+                    queue.Enqueue((IntPtr)node->Left);
+                    queue.Enqueue((IntPtr)node->Right);
                 }
             }
         }
 
         public void Query(ref NativeList<AABB> result)
         {
-            if (!HasNode(RootIndex))
+            if (_root == null)
             {
                 return;
             }
 
-            var queue = new NativeQueue<int>(Allocator.Temp);
-            queue.Enqueue(RootIndex);
+            using var queue = new NativeQueue<IntPtr>(Allocator.Temp);
+            queue.Enqueue((IntPtr)_root);
 
             while (queue.Count > 0)
             {
-                var index = queue.Dequeue();
-                var node = GetNode(index);
+                var node = (TreeNode*)queue.Dequeue();
 
                 result.Add(node->AABB);
 
                 if (!node->IsLeaf)
                 {
-                    queue.Enqueue(GetLeftIndex(index));
-                    queue.Enqueue(GetRightIndex(index));
+                    queue.Enqueue((IntPtr)node->Left);
+                    queue.Enqueue((IntPtr)node->Right);
                 }
             }
         }
 
         public void Query(AABB aabb, ref NativeList<AABB> result)
         {
-            if (!HasNode(RootIndex))
+            if (_root == null)
             {
                 return;
             }
 
-            var queue = new NativeQueue<int>(Allocator.Temp);
-            queue.Enqueue(RootIndex);
+            using var queue = new NativeQueue<IntPtr>(Allocator.Temp);
+            queue.Enqueue((IntPtr)_root);
 
             while (queue.Count > 0)
             {
-                var index = queue.Dequeue();
-                var node = GetNode(index);
+                var node = (TreeNode*)queue.Dequeue();
+
                 if (!AABB.IsOverlap(node->AABB, aabb))
                 {
                     continue;
@@ -159,278 +147,159 @@
 
                 if (!node->IsLeaf)
                 {
-                    queue.Enqueue(GetLeftIndex(index));
-                    queue.Enqueue(GetRightIndex(index));
+                    queue.Enqueue((IntPtr)node->Left);
+                    queue.Enqueue((IntPtr)node->Right);
                 }
             }
         }
 
         public void Dispose()
         {
-            UnsafeUtility.Free(_nodes, _allocator);
-            _nodes = null;
-            _nodeMap.Dispose();
-        }
-
-        private void CheckCapacity(int index)
-        {
-            var requiredCapacity = index + 1;
-            if (requiredCapacity <= _capacity)
+            using var queue = new NativeQueue<IntPtr>(Allocator.Temp);
+            queue.Enqueue((IntPtr)_root);
+            while (queue.Count > 0)
             {
-                return;
-            }
+                var node = (TreeNode*)queue.Dequeue();
 
-            var newCapacity = MathUtils.NextPowerOfTwo(requiredCapacity);
-            var newNodes = (TreeNode*)UnsafeUtility.Malloc(sizeof(TreeNode) * newCapacity, JobsUtility.CacheLineSize, _allocator);
-
-            for (int i = 0; i < _capacity; i++)
-            {
-                var node = GetNode(_nodes, i);
-                *GetNode(newNodes, i) = new TreeNode
+                if (!node->IsLeaf)
                 {
-                    IsValid = node->IsValid,
-                    EntryId = node->EntryId,
-                    AABB = node->AABB,
-                };
+                    queue.Enqueue((IntPtr)node->Left);
+                    queue.Enqueue((IntPtr)node->Right);
+                }
+
+                ReleaseNode(node);
             }
-
-            for (int i = _capacity; i < newCapacity; i++)
-            {
-                *GetNode(newNodes, i) = new TreeNode
-                {
-                    IsValid = false,
-                };
-            }
-
-            UnsafeUtility.Free(_nodes, _allocator);
-            _nodes = newNodes;
-            _capacity = newCapacity;
-
-            var newNodeMap = new NativeHashMap<uint, int>(newCapacity, _allocator);
-
-            foreach (var v in _nodeMap)
-            {
-                newNodeMap.Add(v.Key, v.Value);
-            }
-
+            _root = null;
             _nodeMap.Dispose();
-            _nodeMap = newNodeMap;
         }
 
         private void Insert(uint entryId, AABB aabb)
         {
             aabb = AABB.Expand(aabb, 1);
 
-            if (!HasNode(RootIndex))
+            if (_root == null)
             {
-                CheckCapacity(RootIndex);
-                CreateLeafNode(RootIndex, entryId, aabb);
+                _root = CreateLeafNode(entryId, aabb);
                 return;
             }
 
-            var selectedIndex = SelectInsertParent(aabb);
+            var selectedNode = SelectInsertParent(_root, aabb);
 
-            var leftIndex = GetLeftIndex(selectedIndex);
-            var rightIndex = GetRightIndex(selectedIndex);
+            var left = CreateLeafNode(selectedNode->EntryId, selectedNode->AABB);
+            left->Parent = selectedNode;
+            selectedNode->Left = left;
 
-            CheckCapacity(rightIndex);
+            var right = CreateLeafNode(entryId, aabb);
+            right->Parent = selectedNode;
+            selectedNode->Right = right;
 
-            var selectedNode = GetNode(selectedIndex);
-            CreateLeafNode(leftIndex, selectedNode->EntryId, selectedNode->AABB);
             selectedNode->EntryId = InvalidEntryId;
 
-            CreateLeafNode(rightIndex, entryId, aabb);
+            UpdateAABBUp(selectedNode);
 
-            UpdateAABBUp(selectedIndex);
-        }
-
-        private void Delete(int nodeIndex)
-        {
-            RemoveNode(nodeIndex);
-
-            if (nodeIndex == RootIndex)
+            static TreeNode* SelectInsertParent(TreeNode* root, AABB aabb)
             {
-                return;
-            }
+                var selectedNode = root;
 
-            var parentIndex = GetParentIndex(nodeIndex);
-            var neighborIndex = GetNeighborIndex(nodeIndex);
-            MoveNodeUpBFS(neighborIndex, parentIndex);
-
-            if (parentIndex == RootIndex)
-            {
-                return;
-            }
-
-            UpdateAABBUp(GetParentIndex(parentIndex));
-        }
-
-        private void UpdateAABBUp(int index)
-        {
-            while (index > RootIndex)
-            {
-                UpdateAABB(index);
-                index = GetParentIndex(index);
-            }
-            UpdateAABB(index);
-        }
-
-        private void UpdateAABB(int index)
-        {
-            var left = GetNode(GetLeftIndex(index));
-            var right = GetNode(GetRightIndex(index));
-            GetNode(index)->AABB = left->AABB + right->AABB;
-        }
-
-        private void MoveNodeUpBFS(int fromIndex, int toIndex)
-        {
-            var queue = new NativeQueue<(int, int)>(Allocator.Temp);
-            queue.Enqueue((fromIndex, toIndex));
-            while (queue.Count > 0)
-            {
-                (fromIndex, toIndex) = queue.Dequeue();
-
-                var isLeaf = GetNode(fromIndex)->IsLeaf;
-                MoveNodeUp(fromIndex, toIndex);
-                if (!isLeaf)
+                while (!selectedNode->IsLeaf)
                 {
-                    queue.Enqueue((GetLeftIndex(fromIndex), GetLeftIndex(toIndex)));
-                    queue.Enqueue((GetRightIndex(fromIndex), GetRightIndex(toIndex)));
+                    selectedNode = SelectChild(selectedNode, aabb);
                 }
+
+                return selectedNode;
+            }
+
+            static TreeNode* SelectChild(TreeNode* parent, AABB aabb)
+            {
+                var left = parent->Left;
+                var right = parent->Right;
+
+                var costLeft = (left->AABB + aabb).Area + right->AABB.Area;
+                var costRight = left->AABB.Area + (right->AABB + aabb).Area;
+
+                if (costLeft < costRight)
+                {
+                    return left;
+                }
+                else if (costLeft > costRight)
+                {
+                    return right;
+                }
+
+                var toLeftVector = math.abs(left->AABB.Min + left->AABB.Max - aabb.Min - aabb.Max);
+                var toRightVector = math.abs(right->AABB.Min + right->AABB.Max - aabb.Min - aabb.Max);
+                costLeft = toLeftVector.x + toLeftVector.y;
+                costRight = toRightVector.x + toRightVector.y;
+
+                return costLeft < costRight ? left : right;
             }
         }
 
-        private void MoveNodeUp(int fromIndex, int toIndex)
+        private void Delete(TreeNode* node)
         {
-            var from = GetNode(fromIndex);
-            var to = GetNode(toIndex);
-
-            to->IsValid = true;
-            to->EntryId = from->EntryId;
-            to->AABB = from->AABB;
-
-            if (from->IsLeaf)
+            if (node != _root)
             {
-                _nodeMap[from->EntryId] = toIndex;
+                var parent = node->Parent;
+                var neighbor = GetNeighbor(node);
+                if (parent == _root)
+                {
+                    _root = neighbor;
+                    neighbor->Parent = null;
+                }
+                else
+                {
+                    if (parent->Parent->Left == parent)
+                    {
+                        parent->Parent->Left = neighbor;
+                    }
+                    else
+                    {
+                        parent->Parent->Right = neighbor;
+                    }
+                    neighbor->Parent = parent->Parent;
+                    UpdateAABBUp(neighbor->Parent);
+                }
+                ReleaseNode(parent);
             }
-
-            RemoveNode(fromIndex);
-        }
-
-        private void CreateLeafNode(int index, uint entryId, AABB aabb)
-        {
-            var nodePtr = GetNode(index);
-            *nodePtr = new TreeNode
+            else
             {
-                IsValid = true,
-                EntryId = entryId,
-                AABB = aabb,
-            };
-            _nodeMap[entryId] = index;
-        }
-
-        private void RemoveNode(int index)
-        {
-            var nodePtr = GetNode(index);
-            *nodePtr = new TreeNode
-            {
-                IsValid = false,
-            };
-        }
-
-        private int SelectInsertParent(AABB aabb)
-        {
-            var selectedIndex = 0;
-
-            while (!GetNode(selectedIndex)->IsLeaf)
-            {
-                selectedIndex = SelectChild(selectedIndex, aabb);
+                _root = null;
             }
-
-            return selectedIndex;
+            ReleaseNode(node);
         }
 
-        private int SelectChild(int parentIndex, AABB aabb)
+        private void UpdateAABBUp(TreeNode* start)
         {
-            var leftIndex = GetLeftIndex(parentIndex);
-            var rightIndex = GetRightIndex(parentIndex);
-
-            var left = GetNode(leftIndex);
-            var right = GetNode(rightIndex);
-
-            var costLeft = (left->AABB + aabb).Area + right->AABB.Area;
-            var costRight = left->AABB.Area + (right->AABB + aabb).Area;
-
-            if (costLeft < costRight)
+            while (start != _root)
             {
-                return leftIndex;
+                start->AABB = start->Left->AABB + start->Right->AABB;
+                start = start->Parent;
             }
-            else if (costLeft > costRight)
-            {
-                return rightIndex;
-            }
-
-            var toLeftVector = math.abs(left->AABB.Min + left->AABB.Max - aabb.Min - aabb.Max);
-            var toRightVector = math.abs(right->AABB.Min + right->AABB.Max - aabb.Min - aabb.Max);
-            costLeft = toLeftVector.x + toLeftVector.y;
-            costRight = toRightVector.x + toRightVector.y;
-
-            return costLeft < costRight ? leftIndex : rightIndex;
+            start->AABB = start->Left->AABB + start->Right->AABB;
         }
 
-        private bool HasNode(int index)
+        private TreeNode* CreateLeafNode(uint entryId, AABB aabb)
         {
-            return TryGetNode(index, out _);
+            var node = (TreeNode*)UnsafeUtility.Malloc(sizeof(TreeNode), 0, _allocator);
+            node->EntryId = entryId;
+            node->AABB = aabb;
+            node->Parent = null;
+            node->Left = null;
+            node->Right = null;
+            _nodeMap[entryId] = (IntPtr)node;
+            return node;
         }
 
-        private bool TryGetNode(int index, out TreeNode* node)
+        private void ReleaseNode(TreeNode* node)
         {
-            if (index >= _capacity)
-            {
-                node = null;
-                return false;
-            }
-
-            node = GetNode(index);
-            return node->IsValid;
+            UnsafeUtility.Free(node, _allocator);
         }
 
-        private TreeNode* GetNode(int index)
+        private static TreeNode* GetNeighbor(TreeNode* node)
         {
-            return GetNode(_nodes, index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static TreeNode* GetNode(TreeNode* nodes, int index)
-        {
-            return nodes + index;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int GetLeftIndex(int index)
-        {
-            return (index << 1) + 1;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int GetRightIndex(int index)
-        {
-            return (index << 1) + 2;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int GetParentIndex(int index)
-        {
-            return (index - 1) >> 1;
-        }
-
-        private static int GetNeighborIndex(int index)
-        {
-            var parent = GetParentIndex(index);
-            var left = GetLeftIndex(parent);
-            return left == index
-                ? GetRightIndex(parent)
-                : left;
+            return node->Parent->Left == node
+                ? node->Parent->Right
+                : node->Parent->Left;
         }
     }
 }
