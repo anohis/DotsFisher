@@ -48,7 +48,7 @@ namespace DotsFisher.EcsSystem
             var transformLookup = SystemAPI.GetComponentLookup<TransformComponent>();
             ref var transform = ref transformLookup.GetRefRW(bulletEntity).ValueRW;
 
-            transform.Position = transform.Position + math.normalize(direction) * 5 * state.World.Time.DeltaTime;
+            transform.Position = transform.Position + math.normalize(direction) * 10 * state.World.Time.DeltaTime;
         }
     }
 }
